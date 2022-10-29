@@ -398,3 +398,4 @@ algorithm = dict(
 )
 
 find_unused_parameters = True
+fp16 = dict(loss_scale=512.)
