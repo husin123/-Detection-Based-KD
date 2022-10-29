@@ -54,7 +54,7 @@ class BaseAlgorithm(BaseModule):
         self.deployed = False
         self._init_mutator(mutator)
         self._init_pruner(pruner)
-        self._init_distiller(distiller)
+        self._init_distiller(distiller) #  TODO, INITIAL DISTILLER
 
     def load_subnet(self, subnet_path):
         """Load subnet searched out in search stage.
@@ -131,7 +131,7 @@ class BaseAlgorithm(BaseModule):
         if distiller is None:
             self.distiller = None
             return
-        self.distiller = build_distiller(distiller)
+        self.distiller = build_distiller(distiller) # TODO: Call it
         self.distiller.prepare_from_student(self.architecture)
 
     @property

@@ -9,7 +9,7 @@ from .base import BaseDistiller
 
 
 @DISTILLERS.register_module()
-class SingleTeacherDistiller(BaseDistiller):
+class SingleTeacherDistiller(BaseDistiller): # TODO: distillation component
     """Distiller with single teacher.
 
     Args:

@@ -2,7 +2,6 @@ import math
 import torch
 import torch.nn as nn
 
-
 def dice_coeff(inputs, eps=1e-12):
     # inputs: [B, T, H*W]
     pred = inputs[:, None, :, :]

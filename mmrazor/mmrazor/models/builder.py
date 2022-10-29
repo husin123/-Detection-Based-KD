@@ -14,7 +14,6 @@ QUANTIZERS = MODELS
 ARCHITECTURES = MODELS
 MUTATORS = MODELS
 
-
 def build_algorithm(cfg):
     """Build compressor."""
     return ALGORITHMS.build(cfg)

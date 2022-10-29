@@ -5,7 +5,7 @@ from .base import BaseAlgorithm
 
 
 @ALGORITHMS.register_module()
-class GeneralDistill(BaseAlgorithm):
+class GeneralDistill(BaseAlgorithm): # TODO: GeneralDistill
     """General Distillation Algorithm.
 
     Args:
@@ -25,7 +25,6 @@ class GeneralDistill(BaseAlgorithm):
         self.with_teacher_loss = with_teacher_loss
 
     def train_step(self, data, optimizer):
-        """"""
         losses = dict()
         if self.with_student_loss:
             student_losses = self.distiller.exec_student_forward(
