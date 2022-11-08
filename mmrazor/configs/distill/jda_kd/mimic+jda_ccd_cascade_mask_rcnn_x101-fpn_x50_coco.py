@@ -1,4 +1,4 @@
-2_base_ = [
+_base_ = [
     '../../_base_/datasets/mmdet/coco_detection.py',
     '../../_base_/schedules/mmdet/schedule_2x.py',
     '../../_base_/mmdet_runtime.py'
@@ -311,9 +311,65 @@ teacher = dict(
             )))
 
 
+custom_imports = dict(imports=['JDA'], allow_failed_imports=False)
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+jda_prob = 0.15
+train_pipeline = [
+    dict(type='LoadImageFromFile'),
+    dict(type='LoadAnnotations', with_bbox=True),
+    dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
+    dict(type='RandomFlip', flip_ratio=0.5),
+    dict(type="ConcatWithAugmentation",
+         ori_translate=[
+             dict(type='Normalize', **img_norm_cfg),
+             dict(type='Pad', size_divisor=32),
+             # dict(type='DefaultFormatBundle'),
+         ],
+         aug_translate=[
+             dict(type="BernoulliChoose",
+                  translate=dict(type='Translate', prob=1, level=4, direction='vertical',max_translate_offset=150),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type="EqualizeTransform", prob=1.),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type='Translate', prob=1, level=2, direction='horizontal',max_translate_offset=150),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type='Shear', prob=1, level=2, direction='vertical'),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type='Rotate', prob=1., level=10, max_rotate_angle=30),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type="ColorTransform", level=6, prob=1.),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type="BrightnessTransform", level=3, prob=1.),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type="ContrastTransform", level=3, prob=1.),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type="InvertTransform", prob=1.),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type='Shear', prob=1, level=1, direction='horizontal'),
+                  p=jda_prob),
+             dict(type='Normalize', **img_norm_cfg),
+             dict(type='Pad', size_divisor=32),
+             # dict(type='DefaultFormatBundle'),
+         ]),
+
+    dict(type='AugCollect', defaultformatbundle=dict(type='DefaultFormatBundle')
+         , keys=['img', 'gt_bboxes', 'gt_labels']),
+]
+data = dict(train=dict(pipeline=train_pipeline))
 # algorithm setting
 algorithm = dict(
-    type='GeneralDistill',
+    type='JDADistill',
+    collect_key=['img', 'gt_bboxes', 'gt_labels'],
     architecture=dict(
         type='MMDetArchitecture',
         model=student,
@@ -330,18 +386,35 @@ algorithm = dict(
                     dict(
                         student_module='roi_head.bbox_roi_extractor',
                         teacher_module='roi_head.bbox_roi_extractor.0',
-                        same_indices=[1],)
+                        same_indices=[1], )
                 ],
                 losses=[
                     dict(
-                        type='DIST',
+                        type='CCD',
                         name='loss_dist_roi_cls_head',
-                        beta=1,
-                        gamma=1,
-                        loss_weight=1,
+                        temperature=1,
                     )
                 ]),
+            dict(
+                student_module='neck',
+                teacher_module='neck',
+                losses=[
+                    dict(
+                        type='MSELoss',
+                        name='loss_mse_fpn',
+                        loss_weight=1,
+                    )
+                ],
+                align_module=dict(
+                    type='conv2d',
+                    num_modules=5,
+                    student_channels=256,
+                    teacher_channels=256,
+                )
+            ),
         ]),
 )
 
 find_unused_parameters = True
+# fp16 = dict(loss_scale=512.)
+# optimizer = dict(type='SGD', lr=0.04, momentum=0.9, weight_decay=0.0001)

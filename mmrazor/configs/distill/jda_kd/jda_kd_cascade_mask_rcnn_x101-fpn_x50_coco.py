@@ -1,3 +1,4 @@
+
 _base_ = [
     '../../_base_/datasets/mmdet/coco_detection.py',
     '../../_base_/schedules/mmdet/schedule_2x.py',
@@ -312,9 +313,8 @@ teacher = dict(
 
 custom_imports = dict(imports=['JDA'], allow_failed_imports=False)
 img_norm_cfg = dict(
-    mean=[150.3735, 146.6505, 136.221], std=[47.888999999999996, 47.583, 49.164], to_rgb=True)
-
-jda_prob = 0.2
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+jda_prob = 0.15
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
@@ -327,34 +327,35 @@ train_pipeline = [
              # dict(type='DefaultFormatBundle'),
          ],
          aug_translate=[
-             dict(type="BernoulliChoose", translate=dict(type='Shear', prob=1, level=10., direction='horizontal'),
-                  p=jda_prob),
              dict(type="BernoulliChoose",
-                  translate=dict(type="BrightnessTransform", level=10, prob=1.),
+                  translate=dict(type='Translate', prob=1, level=4, direction='vertical',max_translate_offset=150),
                   p=jda_prob),
-             dict(type="BernoulliChoose", translate=dict(type='Shear', prob=1, level=10., direction='vertical'),
-                  p=jda_prob),
-             dict(type="BernoulliChoose",
-                  translate=dict(type="ColorTransform", level=10, prob=1.),
-                  p=jda_prob),
-             dict(type="BernoulliChoose", translate=dict(type='Rotate', prob=1., level=10, max_rotate_angle=30),
-                  p=jda_prob),
-             dict(type="BernoulliChoose",
-                  translate=dict(type="ContrastTransform", level=10, prob=1.),
-                  p=jda_prob),
-             # dict(type="BernoulliChoose", translate=dict(type='MinIoURandomCrop'),
-             #      p=jda_prob),
              dict(type="BernoulliChoose",
                   translate=dict(type="EqualizeTransform", prob=1.),
                   p=jda_prob),
              dict(type="BernoulliChoose",
-                  translate=dict(type='Translate', prob=1, level=10, direction='horizontal'),
+                  translate=dict(type='Translate', prob=1, level=2, direction='horizontal',max_translate_offset=150),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type='Shear', prob=1, level=2, direction='vertical'),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type='Rotate', prob=1., level=10, max_rotate_angle=30),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type="ColorTransform", level=6, prob=1.),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type="BrightnessTransform", level=3, prob=1.),
+                  p=jda_prob),
+             dict(type="BernoulliChoose",
+                  translate=dict(type="ContrastTransform", level=3, prob=1.),
                   p=jda_prob),
              dict(type="BernoulliChoose",
                   translate=dict(type="InvertTransform", prob=1.),
                   p=jda_prob),
              dict(type="BernoulliChoose",
-                  translate=dict(type='Translate', prob=1, level=10, direction='vertical'),
+                  translate=dict(type='Shear', prob=1, level=1, direction='horizontal'),
                   p=jda_prob),
              dict(type='Normalize', **img_norm_cfg),
              dict(type='Pad', size_divisor=32),
@@ -389,9 +390,10 @@ algorithm = dict(
                 ],
                 losses=[
                     dict(
-                        type='CCD',
+                        type='KLDivergence',
                         name='loss_dist_roi_cls_head',
-                        temperature=1,
+                        tau=1,
+                        loss_weight=1.,
                     )
                 ]),
         ]),
@@ -399,3 +401,4 @@ algorithm = dict(
 
 find_unused_parameters = True
 fp16 = dict(loss_scale=512.)
+# optimizer = dict(type='SGD', lr=0.04, momentum=0.9, weight_decay=0.0001)

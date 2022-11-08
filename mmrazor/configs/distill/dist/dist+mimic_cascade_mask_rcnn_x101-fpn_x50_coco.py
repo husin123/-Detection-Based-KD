@@ -358,19 +358,6 @@ algorithm = dict(
                     teacher_channels=256,
                 )
             ),
-            #dict(
-            #    student_module='rpn_head.rpn_cls',
-            #    teacher_module='rpn_head.rpn_cls',
-            #    losses=[
-            #        dict(
-            #            type='ReKD',
-            #            name='loss_rekd_rpn_cls_head',
-            #            beta=0,
-            #            gamma=1,
-            #            use_sigmoid=True,
-            #            loss_weight=1,
-            #        )
-            #    ])
         ]),
 )
 

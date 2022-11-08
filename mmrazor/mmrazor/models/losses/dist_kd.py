@@ -4,7 +4,7 @@ import torch.nn as nn
 from ..builder import LOSSES
 
 
-def cosine_similarity(a, b, eps=1e-8):
+def cosine_similarity(a, b, eps=1e-5):
     return (a * b).sum(1) / (a.norm(dim=1) * b.norm(dim=1) + eps)
 
 

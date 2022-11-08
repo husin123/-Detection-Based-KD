@@ -1,4 +1,4 @@
-2_base_ = [
+_base_ = [
     '../../_base_/datasets/mmdet/coco_detection.py',
     '../../_base_/schedules/mmdet/schedule_2x.py',
     '../../_base_/mmdet_runtime.py'
@@ -334,14 +334,13 @@ algorithm = dict(
                 ],
                 losses=[
                     dict(
-                        type='DIST',
+                        type='KLDivergence',
                         name='loss_dist_roi_cls_head',
-                        beta=1,
-                        gamma=1,
-                        loss_weight=1,
+                        tau=1,
                     )
                 ]),
         ]),
 )
 
 find_unused_parameters = True
+fp16 = dict(loss_scale=512.)
