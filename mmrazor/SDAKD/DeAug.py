@@ -134,6 +134,7 @@ class Mulit_Augmentation(nn.Module):
         self.nolearning_model_list.append(invert)
         _cutout = Cutout(224)
         self.nolearning_model_list.append(_cutout)
+        self.iteration = 0
 
     def _freeze_parameter(self):
 
@@ -148,12 +149,14 @@ class Mulit_Augmentation(nn.Module):
         self.probabilities.data = torch.clamp(self.probabilities.data, EPS, 1 - EPS)
         self.magnitudes.data = torch.clamp(self.magnitudes.data, EPS, 1 - EPS)
 
-    def forward(self, image, boxes):
+    def forward(self, image, boxes, labels):
         p = torch.sigmoid(self.probabilities)
         m = torch.sigmoid(self.magnitudes)
         p = relaxed_bernoulli(p)
-        len = p.shape[0]
-        index = torch.randperm(len).to(image.device)
+        _len = p.shape[0]
+        index = torch.randperm(_len).to(image.device)
+        print(image.shape)
+        print("---------------------")
         index = index[: self.solve_number].tolist()
         color_result = []
         p_iter = 0
@@ -161,7 +164,7 @@ class Mulit_Augmentation(nn.Module):
         for tran in self.learning_color_model_list:
             if p_iter in index:
                 _m = m[p_iter].view(-1, 1).expand(image.shape[0], -1)
-                now_image, now_boxes = tran(image, _m, boxes)
+                now_image, _ = tran(image, _m, boxes)
                 now_image = p[p_iter] * now_image + (1 - p[p_iter]) * image
                 color_result.append(now_image - image)
             p_iter += 1
@@ -179,56 +182,101 @@ class Mulit_Augmentation(nn.Module):
 
         for tran in self.nolearning_model_list:
             if p_iter in index:
-                now_image, new_boxes = tran(image,boxes)
+                now_image, _ = tran(image, boxes)
                 now_image = p[p_iter] * now_image + (1 - p[p_iter]) * image
                 color_result.append(now_image - image)
             p_iter += 1
 
-        if len(stn_result)>0:
+        if len(stn_result) > 0:
             stn_result = torch.stack(stn_result).sum(0) + \
                          torch.Tensor([[[1, 0, 0], [0, 1, 0]]]).to(stn_result[0].device).expand_as(stn_result[0])
-            image, boxes = self.forward_stn(image,stn_result,boxes)
-        if len(color_result)>0:
+            from .DV import detection_vis
+            detection_vis(image[0], boxes[0], labels[0], "./image", f"1_{self.iteration}")
+            image, boxes, labels = self.forward_stn(image, stn_result, boxes, labels)
+            detection_vis(image[0], boxes[0], labels[0], "./image", f"0_{self.iteration}")
+            self.iteration += 1
+            if self.iteration > 10:
+                exit(-1)
+        if len(color_result) > 0:
             image = image + torch.stack(color_result).sum(0)
-        return image,boxes
+        return image, boxes, labels
 
-    def forward_stn(self, x, H, boxes):
+    def forward_stn(self, x, H, boxes, labels):
         grid = torch.nn.functional.affine_grid(H, x.size())
         x = torch.nn.functional.grid_sample(x, grid)
-        boxes = self.forward_box(boxes, H, x.shape)
-        return x, boxes
+        boxes, labels = self.forward_box(boxes, labels, H, x.shape)
+        return x, boxes, labels
 
-    def forward_box(self, boxes, H, size):
+    def forward_box(self, boxes, labels, H, size):
         b, c, h, w = size
+        center_h, center_w = h / 2, w / 2
         result_boxes = []
+        result_labels = []
+        _w = H[:, 0, 0] * H[:, 1, 1] - H[:, 1, 0] * H[:, 0, 1]
+        new00 = H[:, 1, 1] / _w
+        new01 = - H[:, 0, 1] / _w
+        new02 = (H[:, 0, 2] * H[:, 1, 1] - H[:, 1, 2] * H[:, 0, 1]) / _w
+        _w = - _w
+        new10 = H[:, 1, 0] / _w
+        new11 = - H[:, 0, 0] / _w
+        new12 = (H[:, 0, 2] * H[:, 1, 0] - H[:, 1, 2] * H[:, 0, 0]) / _w
+        new00,new01,new02,new10,new11,new12 = new00.clone(), new01.clone(),new02.clone(), new10.clone(), new11.clone(), new12.clone()
+        H = torch.stack([torch.stack([new00,new10],dim=-1),torch.stack([new01,new11],dim=-1),torch.stack([new02,new12],dim=-1)],dim=-1)
+        H = H.contiguous()
         for i, box in enumerate(boxes):  # min_x,min_y,max_x,_max_y
+            label = labels[i]
             min_x, min_y, max_x, max_y = torch.split(
-                box, box.shape[-1], dim=-1)
+                box, 1, dim=-1)
+            # x = (x0 - cw) * w00 + (y0 - ch)* cw/ch * w01 + w02 * -cw + cw
+            # [1,1] [-1,1]
+            # [1,-1] [-1,-1]
+
+            # xold = xnew * w00 + ynew* w01 + w02
+            # yold = xnew * w10 + ynew* w11 + w12
+            # => xold*w11 = xnew * w00*w11 + ynew * w01 * w11 + w02 * w11
+            # => yold*w01 = xnew * w10*w01 + ynew * w01 * w11 + w12 * w01
+            # => ((xold*w11-yold*w01) + w02*w11 - w12*w01 )/(w00*w11-w10*w01) = xnew
+            # => w11/(w00*w11-w10*w01) * xold + (-w01)/(w00*w11-w10*w01) + (w02*w11 - w12*w01)/(w00*w11-w10*w01) = xnew
+            #
+            # => xold*w10 = xnew * w00*w10 + ynew * w01 * w10 + w02 * w10
+            # => yold*w00 = xnew * w10*w00+ ynew * w11 * w00 + w12 * w00
+            # => xold * w10 - yold * w00 + (w02*w10 - w12 * w00) = ynew * (w01*w10 - w11*w00)
+            # => w10/(w01*w10-w11*w00) * xold + (-w00)/(w01*w10-w11*w00) * yold + (w02*w10-w12*w00)/(w01*w10 - w11*w00) = ynew
+            min_x, min_y, max_x, max_y = -(min_x - center_w) / center_w, -(min_y - center_h) / center_h, -(
+                    max_x - center_w) / center_w, -(max_y - center_h) / center_h
             coordinates = torch.stack([torch.stack([min_x, min_y]), torch.stack([max_x, min_y]),
                                        torch.stack([min_x, max_y]), torch.stack([max_x, max_y])])  # [4, 2, nb_bbox, 1]
+
             coordinates = torch.cat(
                 (coordinates,
                  torch.ones(4, 1, coordinates.shape[2], 1, dtype=coordinates.dtype).to(coordinates.device)),
                 dim=1)  # [4, 3, nb_bbox, 1]
             coordinates = coordinates.permute(2, 0, 1, 3)  # [nb_bbox, 4, 3, 1]
+            # H[i,0,1]= -H[i,0,1]
+            # H[i,1,0]= -H[i,1,0]
             coordinates = torch.matmul(H[i], coordinates)  # [nb_bbox, 4, 2, 1]
             coordinates = coordinates[..., 0]  # [nb_bbox, 4, 2]
-
+            coordinates[:, :, 1] = coordinates[:, :, 1] * -center_h + center_h
+            coordinates[:, :, 0] = coordinates[:, :, 0] * -center_w + center_w
             min_x, min_y = torch.min(coordinates[:, :, 0], dim=1)[0], torch.min(coordinates[:, :, 1], dim=1)[0]
             max_x, max_y = torch.max(coordinates[:, :, 0], dim=1)[0], torch.max(coordinates[:, :, 1], dim=1)[0]
-
             min_x, min_y = torch.clip(
-                min_y, min=0, max=h), torch.clip(
-                min_x, min=0, max=w)
+                min_x, min=0, max=h), torch.clip(
+                min_y, min=0, max=w)
             max_x, max_y = torch.clip(
-                max_x, min=min_x, max=w), torch.clip(
-                max_y, min=min_y, max=h)
+                max_x, min=min_x, max=torch.Tensor([w]).to(max_x.device).expand_as(max_x)), torch.clip(
+                max_y, min=min_y, max=torch.Tensor([h]).to(max_y.device).expand_as(max_y))
             box = torch.stack([min_x, min_y, max_x, max_y],
                               dim=-1)
             mask = (box[:, 0] != box[:, 2]) & (box[:, 1] != box[:, 3])
             box = box[mask, :]
+            label = label[mask]
             if box.shape[0] > 0:
                 result_boxes.append(box)
+                result_labels.append(label)
             else:
-                raise KeyError
-        return result_boxes
+                result_boxes.append(box)
+                result_labels.append(label)
+                print("[WARNING] box.shape[0]==0")
+
+        return result_boxes, result_labels
