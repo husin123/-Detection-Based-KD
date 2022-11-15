@@ -143,6 +143,22 @@ class Mulit_Augmentation(nn.Module):
         for parameter in self.learning_color_model_list.parameters():
             parameter.requires_grad = False
 
+    def print_magnitudes(self):
+        magnitudes = torch.sigmoid(self.magnitudes.data)
+        keys = self.LEARNING_COLOR_LIST + self.LEARNING_STN_LIST
+        result_str = ""
+        for key,magnitude in zip(keys,magnitudes):
+            result_str+=f"key is {key}, magnitude is {round(magnitude.item(),3)}; "
+        return result_str
+
+    def print_probabilities(self):
+        probabilities = torch.sigmoid(self.probabilities.data)
+        keys = self.LEARNING_COLOR_LIST + self.LEARNING_STN_LIST
+        result_str = ""
+        for key,probability in zip(keys,probabilities):
+            result_str+=f"key is {key}, magnitude is {round(probability.item(),3)}; "
+        return result_str
+
     @torch.no_grad()
     def _clamp(self):
         EPS = 1e-8
@@ -155,8 +171,6 @@ class Mulit_Augmentation(nn.Module):
         p = relaxed_bernoulli(p)
         _len = p.shape[0]
         index = torch.randperm(_len).to(image.device)
-        print(image.shape)
-        print("---------------------")
         index = index[: self.solve_number].tolist()
         color_result = []
         p_iter = 0
@@ -190,13 +204,7 @@ class Mulit_Augmentation(nn.Module):
         if len(stn_result) > 0:
             stn_result = torch.stack(stn_result).sum(0) + \
                          torch.Tensor([[[1, 0, 0], [0, 1, 0]]]).to(stn_result[0].device).expand_as(stn_result[0])
-            from .DV import detection_vis
-            detection_vis(image[0], boxes[0], labels[0], "./image", f"1_{self.iteration}")
             image, boxes, labels = self.forward_stn(image, stn_result, boxes, labels)
-            detection_vis(image[0], boxes[0], labels[0], "./image", f"0_{self.iteration}")
-            self.iteration += 1
-            if self.iteration > 10:
-                exit(-1)
         if len(color_result) > 0:
             image = image + torch.stack(color_result).sum(0)
         return image, boxes, labels

@@ -315,9 +315,9 @@ custom_imports = dict(imports=['SDAKD'], allow_failed_imports=False)
 
 
 algorithm = dict(
-    type='SDADistill',
+    type='OSDDistill',
     solve_number=4,
-    convertor_training_epoch=[6,12],
+    convertor_training_epoch=[0,6,12],
     convertor_epoch_number=1,
     pretrain_path='/home/sst/product/SDAKD/SDAKD_FOR_BASELINE/checkpoints/Augmentation',
     collect_key=['img', 'gt_bboxes', 'gt_labels'],
@@ -326,7 +326,7 @@ algorithm = dict(
         model=student,
     ),
     distiller=dict(
-        type='SingleTeacherDistiller',
+        type='OSDTeacherDistiller',
         teacher=teacher,
         teacher_trainable=False,
         components=[
@@ -349,7 +349,7 @@ algorithm = dict(
                 ]),
         ]),
 )
-
+runner = dict(type='OSDBasedRunner', max_epochs=24)
 find_unused_parameters = True
 fp16 = dict(loss_scale=512.)
 # optimizer = dict(type='SGD', lr=0.04, momentum=0.9, weight_decay=0.0001)
