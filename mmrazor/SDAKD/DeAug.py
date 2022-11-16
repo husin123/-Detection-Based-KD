@@ -156,7 +156,7 @@ class Mulit_Augmentation(nn.Module):
         keys = self.LEARNING_COLOR_LIST + self.LEARNING_STN_LIST
         result_str = ""
         for key,probability in zip(keys,probabilities):
-            result_str+=f"key is {key}, magnitude is {round(probability.item(),3)}; "
+            result_str+=f"key is {key}, probability is {round(probability.item(),3)}; "
         return result_str
 
     @torch.no_grad()

@@ -38,41 +38,52 @@ class OSDDistill(GeneralDistill):
         ).cuda(gpu),
             device_ids=[gpu],
             find_unused_parameters=True )
+
+    def set_convertor(self,modules:nn.Module):
+        if not isinstance(modules,nn.Module):
+            return
+        if hasattr(modules,"set_convertor_training"):
+            modules.set_convertor_training()
+            print(f"successfully set convertor training in {modules.__class__.__name__}")
+        for name,module in modules.named_children():
+            self.set_convertor(module)
+
+    def unset_convertor(self,modules:nn.Module):
+        if not isinstance(modules,nn.Module):
+            return
+        if hasattr(modules,"unset_convertor_training"):
+            modules.unset_convertor_training()
+            print(f"successfully unset convertor training in {modules.__class__.__name__}")
+        for name,module in modules.named_children():
+            self.unset_convertor(module)
+
     def train_convertor_step(self, data, optimizer):
         augment_data = dict()
         augment_data["img_metas"] = copy.deepcopy(data["img_metas"])
         data["img"].requires_grad = True
-        self.distiller.set_convertor_training()
         augment_data["img"] ,augment_data["gt_bboxes"] ,augment_data["gt_labels"]\
             = self.convertor(data["img"] ,data["gt_bboxes"] ,data["gt_labels"])
         losses = dict()
-        if self.with_student_loss:
-            student_losses = self.distiller.exec_student_forward(
-                self.architecture, augment_data)
-            student_losses = add_prefix(student_losses, 'student')
-            losses.update(student_losses)
-        else:
-            # Just to be able to trigger the forward hooks that
-            # have been registered
-            _ = self.distiller.exec_student_forward(self.architecture, augment_data)
 
-        if self.with_teacher_loss:
-            teacher_losses = self.distiller.exec_teacher_forward(augment_data)
-            teacher_losses = add_prefix(teacher_losses, 'teacher')
-            losses.update(teacher_losses)
-        else:
-            # Just to be able to trigger the forward hooks that
-            # have been registered
-            _ = self.distiller.exec_teacher_forward(augment_data)
+        # TODO: TRAINING STUDENT
+        student_losses = self.distiller.exec_student_forward(
+            self.architecture, augment_data)
+        student_losses = add_prefix(student_losses, 'student')
+        losses.update(student_losses)
 
-        distill_losses = self.distiller.compute_distill_loss(augment_data)
-        distill_losses = add_prefix(distill_losses, 'distiller')
-        losses.update(distill_losses)
+        # TODO: TRAINING TEACHER
+        teacher_losses = self.distiller.exec_teacher_forward(augment_data)
+        teacher_losses = add_prefix(teacher_losses, 'teacher')
+        losses.update(teacher_losses)
+
+        #
+        # distill_losses = self.distiller.compute_distill_loss(augment_data)
+        # distill_losses = add_prefix(distill_losses, 'distiller')
+        # losses.update(distill_losses)
 
         loss, log_vars = self._parse_losses(losses)
         outputs = dict(
             loss=loss, log_vars=log_vars, num_samples=len(augment_data['img'].data))
-        self.distiller.unset_convertor_training()
         return outputs
 
     def train_step(self, data, optimizer):

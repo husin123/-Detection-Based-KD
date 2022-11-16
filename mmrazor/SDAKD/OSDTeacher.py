@@ -1,6 +1,6 @@
 from mmrazor.models.distillers.single_teacher import SingleTeacherDistiller
 from mmrazor.models.builder import DISTILLERS,MODELS
-
+import torch
 
 @DISTILLERS.register_module()
 class OSDTeacherDistiller(SingleTeacherDistiller):
@@ -66,3 +66,24 @@ class OSDTeacherDistiller(SingleTeacherDistiller):
         if self.training or self.convertor_training:
             self.student_outputs[self.student_module2name[module]].append(
                 outputs)
+
+
+    def exec_teacher_forward(self, data):
+        """Execute the teacher's forward function.
+
+        After this function, the teacher's featuremaps will be saved in
+        ``teacher_outputs``.
+        """
+
+        # Convert the context manager's mode to teacher.
+        self.reset_ctx_teacher_mode(True)
+        # Clear the saved data of the last forward。
+        self.reset_outputs(self.teacher_outputs)
+
+        if self.teacher_trainable or self.convertor_training:
+            output = self.teacher(**data)
+        else:
+            with torch.no_grad():
+                output = self.teacher(**data)
+
+        return output

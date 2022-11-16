@@ -5,6 +5,8 @@ _base_ = [
     '../../_base_/mmdet_runtime.py'
 ]
 
+custom_imports = dict(imports=['SDAKD'], allow_failed_imports=False)
+
 # model settings
 student = dict(
     type='mmdet.FasterRCNN',
@@ -37,8 +39,8 @@ student = dict(
             target_means=[.0, .0, .0, .0],
             target_stds=[1.0, 1.0, 1.0, 1.0]),
         loss_cls=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_bbox=dict(type='L1Loss', loss_weight=1.0)),
+            type='OSDCrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
+        loss_bbox=dict(type='OSDL1Loss', loss_weight=1.0)),
     roi_head=dict(
         type='StandardRoIHead',
         bbox_roi_extractor=dict(
@@ -58,8 +60,8 @@ student = dict(
                 target_stds=[0.1, 0.1, 0.2, 0.2]),
             reg_class_agnostic=False,
             loss_cls=dict(
-                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type='L1Loss', loss_weight=1.0))),
+                type='OSDCrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
+            loss_bbox=dict(type='OSDL1Loss', loss_weight=1.0))),
     # model training and testing settings
     train_cfg=dict(
         rpn=dict(
@@ -310,8 +312,6 @@ teacher = dict(
             nms=dict(type='nms', iou_threshold=0.5),
             max_per_img=100,
         )))
-
-custom_imports = dict(imports=['SDAKD'], allow_failed_imports=False)
 
 
 algorithm = dict(

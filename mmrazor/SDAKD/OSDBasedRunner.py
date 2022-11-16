@@ -70,6 +70,7 @@ class OSDBasedRunner(EpochBasedRunner):
     def run_convertor_iter(self, data_batch, **kwargs):
         self.model.module.architecture.eval()
         self.model.module.architecture.requires_grad_(False)
+        self.model.module.distiller.teacher.requires_grad_(False)
         inputs, kwargs = self.model.scatter([data_batch,self.optimizer], kwargs, self.model.device_ids)
         if len(self.model.device_ids) == 1:
             output = self.model.module.train_convertor_step(*inputs[0], **kwargs[0])
@@ -90,6 +91,7 @@ class OSDBasedRunner(EpochBasedRunner):
                 self.require_forward_param_sync = False
         self.model.module.architecture.train()
         self.model.module.architecture.requires_grad_(True)
+        self.model.module.distiller.teacher.requires_grad_(True)
         self.c_outputs = output
 
     def train_convertor(self, data_loader, **kwargs):
@@ -116,6 +118,7 @@ class OSDBasedRunner(EpochBasedRunner):
                 self.logger.info(magnitude_str)
                 probability_str = self.model.module.convertor.module.print_probabilities()
                 self.logger.info(probability_str)
+                self.logger.info(self.c_outputs["log_vars"])
 
         c_average_loss = round(self.c_total_loss/self.c_total_iter,4)
         self.c_scheduler.step(c_average_loss)
@@ -170,11 +173,14 @@ class OSDBasedRunner(EpochBasedRunner):
                         continue
                 if p==-1:
                     raise NotImplementedError("no training workflow!")
+                self.model.module.set_convertor(self.model.module)
                 self.logger.info("begin training convertor!")
                 for _ in range(self.model.module.convertor_epoch_number):
                     self.logger.info("convertor epoch %s begin",_)
                     self.train_convertor(data_loaders[p],**kwargs)
                     self.logger.info("convertor epoch %s end",_)
+
+                self.model.module.unset_convertor(self.model.module)
 
             for i, flow in enumerate(workflow):
                 mode, epochs = flow
