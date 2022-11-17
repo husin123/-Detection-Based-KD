@@ -1,3 +1,4 @@
+import math
 import os
 import random
 
@@ -8,9 +9,12 @@ import torch.nn.functional as F
 from torch.nn import Parameter
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
+from mmdet.datasets.pipelines.transforms import CutOut
+import mmcv
 from .DC import DetectionColorAugmentation
 from .DS import DetectionFreezeSTN
 from .AP import _apply_op
+
 
 
 def relaxed_bernoulli(logits, temp=0.05):
@@ -132,7 +136,7 @@ class Mulit_Augmentation(nn.Module):
             ),
         )
         self.nolearning_model_list.append(invert)
-        _cutout = Cutout(224)
+        _cutout = Cutout(128)
         self.nolearning_model_list.append(_cutout)
         self.iteration = 0
 
@@ -201,12 +205,13 @@ class Mulit_Augmentation(nn.Module):
                 color_result.append(now_image - image)
             p_iter += 1
 
+        if len(color_result) > 0:
+            image = image + torch.stack(color_result).sum(0)
+
         if len(stn_result) > 0:
             stn_result = torch.stack(stn_result).sum(0) + \
                          torch.Tensor([[[1, 0, 0], [0, 1, 0]]]).to(stn_result[0].device).expand_as(stn_result[0])
             image, boxes, labels = self.forward_stn(image, stn_result, boxes, labels)
-        if len(color_result) > 0:
-            image = image + torch.stack(color_result).sum(0)
         return image, boxes, labels
 
     def forward_stn(self, x, H, boxes, labels):
@@ -268,12 +273,15 @@ class Mulit_Augmentation(nn.Module):
             coordinates[:, :, 0] = coordinates[:, :, 0] * -center_w + center_w
             min_x, min_y = torch.min(coordinates[:, :, 0], dim=1)[0], torch.min(coordinates[:, :, 1], dim=1)[0]
             max_x, max_y = torch.max(coordinates[:, :, 0], dim=1)[0], torch.max(coordinates[:, :, 1], dim=1)[0]
-            min_x, min_y = torch.clip(
-                min_x, min=0, max=h), torch.clip(
-                min_y, min=0, max=w)
-            max_x, max_y = torch.clip(
-                max_x, min=min_x, max=torch.Tensor([w]).to(max_x.device).expand_as(max_x)), torch.clip(
-                max_y, min=min_y, max=torch.Tensor([h]).to(max_y.device).expand_as(max_y))
+            min_x[min_x < 0] = 0
+            min_x[min_x > w] = w
+            min_y[min_y < 0] = 0
+            min_y[min_y > h] = h
+            max_x = torch.where(max_x < min_x,min_x,max_x)
+            max_x[max_x > w] = w
+            max_y = torch.where(max_y < min_y,min_y,max_y)
+            max_y[max_y > h] = h
+
             box = torch.stack([min_x, min_y, max_x, max_y],
                               dim=-1)
             mask = (box[:, 0] != box[:, 2]) & (box[:, 1] != box[:, 3])

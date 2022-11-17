@@ -38,6 +38,7 @@ class OSDDistill(GeneralDistill):
         ).cuda(gpu),
             device_ids=[gpu],
             find_unused_parameters=True )
+        self._iter = 0
 
     def set_convertor(self,modules:nn.Module):
         if not isinstance(modules,nn.Module):
@@ -95,6 +96,7 @@ class OSDDistill(GeneralDistill):
         img = torch.cat([new_img,img],dim=0)
         gt_bboxes = new_gt_bboxes + gt_bboxes
         gt_labels = new_gt_labels + gt_labels
+
         data["gt_bboxes"] = gt_bboxes
         data["gt_labels"] = gt_labels
         data["img"] = img
