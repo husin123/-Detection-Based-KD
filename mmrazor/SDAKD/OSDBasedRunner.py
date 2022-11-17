@@ -67,6 +67,14 @@ class OSDBasedRunner(EpochBasedRunner):
         self.c_scheduler = ALRS(self.c_optimizer)
         self.c_scaler = torch.cuda.amp.GradScaler()
 
+    def reset_convertor(self):
+        del self.c_optimizer
+        del self.c_scaler
+        del self.c_scheduler
+        self.c_optimizer = torch.optim.SGD(self.model.module.convertor.parameters(), lr=0.01, momentum=0.9)
+        self.c_scheduler = ALRS(self.c_optimizer)
+        self.c_scaler = torch.cuda.amp.GradScaler()
+
     def run_convertor_iter(self, data_batch, **kwargs):
         self.model.module.architecture.eval()
         self.model.module.architecture.requires_grad_(False)
@@ -174,6 +182,7 @@ class OSDBasedRunner(EpochBasedRunner):
                 if p==-1:
                     raise NotImplementedError("no training workflow!")
                 self.model.module.set_convertor(self.model.module)
+                self.reset_convertor()
                 self.logger.info("begin training convertor!")
                 for _ in range(self.model.module.convertor_epoch_number):
                     self.logger.info("convertor epoch %s begin",_)
