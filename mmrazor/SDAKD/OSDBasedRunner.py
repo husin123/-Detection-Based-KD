@@ -116,6 +116,8 @@ class OSDBasedRunner(EpochBasedRunner):
             self.run_convertor_iter(data_batch, **kwargs)
             self.c_optimizer.zero_grad()
             self.c_scaler.scale(self.c_outputs['loss']).backward()
+            self.c_scaler.unscale_(self.c_optimizer)
+            torch.nn.utils.clip_grad_norm_(self.model.module.convertor.parameters(),20)
             self.c_scaler.step(self.c_optimizer)
             self.c_scaler.update()
             self.c_total_loss+=self.c_outputs['loss'].item()

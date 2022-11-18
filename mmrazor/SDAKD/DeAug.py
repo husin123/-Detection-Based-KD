@@ -165,11 +165,11 @@ class Mulit_Augmentation(nn.Module):
 
     @torch.no_grad()
     def _clamp(self):
-        EPS = 1e-8
-        self.probabilities.data = torch.clamp(self.probabilities.data, EPS, 1 - EPS)
-        self.magnitudes.data = torch.clamp(self.magnitudes.data, EPS, 1 - EPS)
+        self.probabilities.data = torch.clamp(self.probabilities.data, -1000, 1000)
+        self.magnitudes.data = torch.clamp(self.magnitudes.data, -1000, 1000)
 
     def forward(self, image, boxes, labels):
+        self._clamp()
         p = torch.sigmoid(self.probabilities)
         m = torch.sigmoid(self.magnitudes)
         p = relaxed_bernoulli(p)

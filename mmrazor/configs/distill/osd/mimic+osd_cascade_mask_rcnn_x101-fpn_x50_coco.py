@@ -319,7 +319,7 @@ algorithm = dict(
     solve_number=4,
     convertor_training_epoch=[6,12],
     convertor_epoch_number=1,
-    pretrain_path='/home/sst/product/SDAKD/SDAKD_FOR_BASELINE/checkpoints/Augmentation',
+    pretrain_path='../Augmentation',
     collect_key=['img', 'gt_bboxes', 'gt_labels'],
     architecture=dict(
         type='MMDetArchitecture',
@@ -347,6 +347,23 @@ algorithm = dict(
                         loss_weight=1.,
                     )
                 ]),
+            dict(
+                student_module='neck',
+                teacher_module='neck',
+                losses=[
+                    dict(
+                        type='MSELoss',
+                        name='loss_mse_fpn',
+                        loss_weight=1,
+                    )
+                ],
+                align_module=dict(
+                    type='conv2d',
+                    num_modules=5,
+                    student_channels=256,
+                    teacher_channels=256,
+                )
+            ),
         ]),
 )
 runner = dict(type='OSDBasedRunner', max_epochs=24)
