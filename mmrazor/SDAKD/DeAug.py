@@ -165,8 +165,8 @@ class Mulit_Augmentation(nn.Module):
 
     @torch.no_grad()
     def _clamp(self):
-        self.probabilities.data = torch.clamp(self.probabilities.data, -1000, 1000)
-        self.magnitudes.data = torch.clamp(self.magnitudes.data, -1000, 1000)
+        self.probabilities.data = torch.clamp(self.probabilities.data, -10, 10)
+        self.magnitudes.data = torch.clamp(self.magnitudes.data, -10, 10)
 
     def forward(self, image, boxes, labels):
         self._clamp()
@@ -240,10 +240,8 @@ class Mulit_Augmentation(nn.Module):
             label = labels[i]
             min_x, min_y, max_x, max_y = torch.split(
                 box, 1, dim=-1)
-            # x = (x0 - cw) * w00 + (y0 - ch)* cw/ch * w01 + w02 * -cw + cw
             # [1,1] [-1,1]
             # [1,-1] [-1,-1]
-
             # xold = xnew * w00 + ynew* w01 + w02
             # yold = xnew * w10 + ynew* w11 + w12
             # => xold*w11 = xnew * w00*w11 + ynew * w01 * w11 + w02 * w11
@@ -259,14 +257,11 @@ class Mulit_Augmentation(nn.Module):
                     max_x - center_w) / center_w, -(max_y - center_h) / center_h
             coordinates = torch.stack([torch.stack([min_x, min_y]), torch.stack([max_x, min_y]),
                                        torch.stack([min_x, max_y]), torch.stack([max_x, max_y])])  # [4, 2, nb_bbox, 1]
-
             coordinates = torch.cat(
                 (coordinates,
                  torch.ones(4, 1, coordinates.shape[2], 1, dtype=coordinates.dtype).to(coordinates.device)),
                 dim=1)  # [4, 3, nb_bbox, 1]
             coordinates = coordinates.permute(2, 0, 1, 3)  # [nb_bbox, 4, 3, 1]
-            # H[i,0,1]= -H[i,0,1]
-            # H[i,1,0]= -H[i,1,0]
             coordinates = torch.matmul(H[i], coordinates)  # [nb_bbox, 4, 2, 1]
             coordinates = coordinates[..., 0]  # [nb_bbox, 4, 2]
             coordinates[:, :, 1] = coordinates[:, :, 1] * -center_h + center_h

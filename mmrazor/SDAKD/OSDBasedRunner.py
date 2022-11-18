@@ -63,7 +63,7 @@ class OSDBasedRunner(EpochBasedRunner):
             max_iters,
             max_epochs
         )
-        self.c_optimizer = torch.optim.SGD(self.model.module.convertor.parameters(), lr=0.02, momentum=0.9)
+        self.c_optimizer = torch.optim.SGD(self.model.module.convertor.parameters(), lr=0.01, momentum=0.9)
         self.c_scheduler = ALRS(self.c_optimizer)
         self.c_scaler = torch.cuda.amp.GradScaler()
 
@@ -71,7 +71,7 @@ class OSDBasedRunner(EpochBasedRunner):
         del self.c_optimizer
         del self.c_scaler
         del self.c_scheduler
-        self.c_optimizer = torch.optim.SGD(self.model.module.convertor.parameters(), lr=0.02, momentum=0.9)
+        self.c_optimizer = torch.optim.SGD(self.model.module.convertor.parameters(), lr=0.01, momentum=0.9)
         self.c_scheduler = ALRS(self.c_optimizer)
         self.c_scaler = torch.cuda.amp.GradScaler()
 
