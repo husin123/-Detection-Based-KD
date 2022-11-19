@@ -28,6 +28,7 @@ class KLDivergence(nn.Module):
         tau=1.0,
         reduction='batchmean',
         loss_weight=1.0,
+        use_sigmoid=False,
     ):
         super(KLDivergence, self).__init__()
         self.tau = tau
@@ -38,6 +39,7 @@ class KLDivergence(nn.Module):
             f'KLDivergence supports reduction {accept_reduction}, ' \
             f'but gets {reduction}.'
         self.reduction = reduction
+        self.sigmoid = use_sigmoid
 
     def forward(self, preds_S, preds_T):
         """Forward computation.
@@ -51,11 +53,26 @@ class KLDivergence(nn.Module):
         Return:
             torch.Tensor: The calculated loss value.
         """
+        if preds_T.ndim>2:
+            num_classes= preds_S.shape[-1]
+            preds_S = preds_S.view(-1,num_classes)
+            preds_T = preds_T.view(-1,num_classes)
         preds_T = preds_T.detach()
+        if self.sigmoid:
+            _preds_S = (preds_S/ self.tau).sigmoid()[...,None]
+            _preds_T = (preds_T/ self.tau).sigmoid()[...,None]
+            _preds_S = torch.cat([_preds_S,1-_preds_S],-1).view(-1,2)
+            _preds_T = torch.cat([_preds_T,1-_preds_T],-1).view(-1,2)
+            _loss = = (self.tau**2) * F.kl_div(
+            torch.log(_preds_S),
+            preds_T,
+            reduction=self.reduction)
+        else:
+            _loss = 0
         softmax_pred_T = F.softmax(preds_T / self.tau, dim=1)
         logsoftmax_preds_S = F.log_softmax(preds_S / self.tau, dim=1)
         loss = (self.tau**2) * F.kl_div(
             logsoftmax_preds_S, 
             softmax_pred_T, 
-            reduction=self.reduction)
+            reduction=self.reduction) + _loss
         return self.loss_weight * loss
