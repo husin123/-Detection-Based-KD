@@ -178,5 +178,5 @@ algorithm = dict(
 )
 runner = dict(type='OSDBasedRunner', max_epochs=24)
 find_unused_parameters = True
-fp16 = dict(loss_scale=512.)
+# fp16 = dict(loss_scale=512.)
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)

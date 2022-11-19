@@ -122,6 +122,8 @@ class OSDBasedRunner(EpochBasedRunner):
             self.c_scaler.update()
             self.c_total_loss+=self.c_outputs['loss'].item()
             self.c_total_iter+=1
+            if self.c_total_iter>3000:
+                break
             if self.c_total_iter%100==0:
                 self.logger.info('convertor loss: %s, iter: %d', round(self.c_total_loss/self.c_total_iter,4), self.c_total_iter)
                 magnitude_str = self.model.module.convertor.module.print_magnitudes()

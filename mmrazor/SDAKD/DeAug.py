@@ -110,14 +110,14 @@ class Mulit_Augmentation(nn.Module):
 
         for name in self.LEARNING_STN_LIST:
             path = concat_path(name)
-            state_dict = torch.load(path)
+            state_dict = torch.load(path,map_location="cpu")
             model = DetectionFreezeSTN()
             model.load_state_dict(state_dict)
             self.learning_stn_model_list.append(model)
 
         for name in self.LEARNING_COLOR_LIST:
             path = concat_path(name)
-            state_dict = torch.load(path)
+            state_dict = torch.load(path,map_location="cpu")
             model = DetectionColorAugmentation()
             model.load_state_dict(state_dict)
             self.learning_color_model_list.append(model)
