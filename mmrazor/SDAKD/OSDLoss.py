@@ -100,7 +100,7 @@ def osd_cross_entropy(pred,
     # element-wise losses
     if pred.dim() != label.dim():
         label, weight = _expand_onehot_labels(label, weight, pred.size(-1))
-    loss = - torch.log(1 - pred.softmax(1)) * label
+    loss = - torch.log(1 - pred.softmax(1) + 1e-10) * label
     if weight is not None:
         weight = weight.float()
     loss = weight_reduce_loss(
@@ -153,7 +153,7 @@ def osd_mask_cross_entropy(pred,
     inds = torch.arange(0, num_rois, dtype=torch.long, device=pred.device)
     pred_slice = pred[inds, label].squeeze(1)
     pred_slice = pred_slice.sigmoid()
-    loss = - (target.float() * torch.log(1 - pred_slice) + (1 - target.float()) * torch.log(pred_slice))
+    loss = - (target.float() * torch.log(1 - pred_slice + 1e-10) + (1 - target.float()) * torch.log(pred_slice + 1e-8))
     loss = loss.mean()
     return loss
 
@@ -186,7 +186,7 @@ def osd_binary_cross_entropy(pred,
     if weight is not None:
         weight = weight.float()
     pred = pred.sigmoid()
-    loss = - (label.float() * torch.log(1 - pred) + (1 - label.float()) * torch.log(pred))
+    loss = - (label.float() * torch.log(1 - pred + 1e-10) + (1 - label.float()) * torch.log(pred + 1e-10))
     # do the reduction for the weighted loss
     loss = weight_reduce_loss(
         loss, weight, reduction=reduction, avg_factor=avg_factor)
