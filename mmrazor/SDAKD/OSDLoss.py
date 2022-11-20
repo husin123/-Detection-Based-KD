@@ -311,7 +311,7 @@ def osd_py_sigmoid_focal_loss(pred,
         avg_factor (int, optional): Average factor that is used to average
             the loss. Defaults to None.
     """
-    pred_sigmoid = 1 - pred.sigmoid()
+    pred_sigmoid = 1 - pred.sigmoid() +1e-10
     target = target.type_as(pred)
     loss = F.binary_cross_entropy(
         pred_sigmoid, target, reduction='none')
