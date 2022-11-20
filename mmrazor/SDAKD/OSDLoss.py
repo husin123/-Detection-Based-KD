@@ -312,9 +312,12 @@ def osd_py_sigmoid_focal_loss(pred,
             the loss. Defaults to None.
     """
     pred_sigmoid = 1 - pred.sigmoid() +1e-10
+    pt = (1 - pred_sigmoid + 2e-10) * target + pred_sigmoid * (1 - target)
+    focal_weight = (alpha * target + (1 - alpha) *
+                    (1 - target)) * pt.pow(gamma)
     target = target.type_as(pred)
     loss = F.binary_cross_entropy(
-        pred_sigmoid, target, reduction='none')
+        pred_sigmoid, target, reduction='none') * focal_weight
     if weight is not None:
         if weight.shape != loss.shape:
             if weight.size(0) == loss.size(0):
@@ -329,8 +332,7 @@ def osd_py_sigmoid_focal_loss(pred,
                 assert weight.numel() == loss.numel()
                 weight = weight.view(loss.size(0), -1)
         assert weight.ndim == loss.ndim
-    loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
-    return loss
+    return loss.mean()
 
 @LOSSES.register_module()
 class OSDFocalLoss(nn.Module):
