@@ -313,11 +313,8 @@ def osd_py_sigmoid_focal_loss(pred,
     """
     pred_sigmoid = 1 - pred.sigmoid()
     target = target.type_as(pred)
-    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
-    focal_weight = (alpha * target + (1 - alpha) *
-                    (1 - target)) * pt.pow(gamma)
-    loss = F.binary_cross_entropy_with_logits(
-        pred, target, reduction='none') * focal_weight
+    loss = F.binary_cross_entropy(
+        pred_sigmoid, target, reduction='none')
     if weight is not None:
         if weight.shape != loss.shape:
             if weight.size(0) == loss.size(0):
