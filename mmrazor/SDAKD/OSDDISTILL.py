@@ -31,6 +31,7 @@ class OSDDistill(GeneralDistill):
         self.solve_number = solve_number
         self.convertor_training_epoch = convertor_training_epoch
         gpu = int(os.environ['LOCAL_RANK'])
+        self.gpu = gpu
         self.convertor_epoch_number = convertor_epoch_number
         self.convertor = DDP(Mulit_Augmentation(
             pretrain_path=pretrain_path,
@@ -60,6 +61,11 @@ class OSDDistill(GeneralDistill):
 
     def train_convertor_step(self, data, optimizer):
         augment_data = dict()
+        if self.gpu==0:
+            data["img"] = data["img"][0,...][None,...]
+            data["gt_bboxes"] = [data["gt_bboxes"][0]]
+            data["gt_labels"] = [data["gt_labels"][0]]
+            data["img_metas"] = [data["img_metas"][0]]
         augment_data["img_metas"] = copy.deepcopy(data["img_metas"])
         data["img"].requires_grad = True
         augment_data["img"] ,augment_data["gt_bboxes"] ,augment_data["gt_labels"]\

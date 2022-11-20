@@ -335,7 +335,6 @@ def osd_py_sigmoid_focal_loss(pred,
     loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
     return loss
 
-
 @LOSSES.register_module()
 class OSDFocalLoss(nn.Module):
 
@@ -366,24 +365,18 @@ class OSDFocalLoss(nn.Module):
         self.alpha = alpha
         self.reduction = reduction
         self.loss_weight = loss_weight
-
-        if torch.cuda.is_available():
-            self.calculate_loss_func = sigmoid_focal_loss
-        else:
-            self.calculate_loss_func = py_sigmoid_focal_loss
+        self.calculate_loss_func = sigmoid_focal_loss
+        self.convertor_learning = False
 
     def set_convertor_training(self):
 
-        if torch.cuda.is_available():
-            self.calculate_loss_func = osd_py_sigmoid_focal_loss
-        else:
-            self.calculate_loss_func = osd_py_sigmoid_focal_loss
+        self.calculate_loss_func = osd_py_sigmoid_focal_loss
+        self.convertor_learning = True
+
     def unset_convertor_training(self):
 
-        if torch.cuda.is_available():
-            self.calculate_loss_func = sigmoid_focal_loss
-        else:
-            self.calculate_loss_func = py_sigmoid_focal_loss
+        self.calculate_loss_func = sigmoid_focal_loss
+        self.convertor_learning = False
 
     def forward(self,
                 pred,
@@ -411,7 +404,7 @@ class OSDFocalLoss(nn.Module):
         reduction = (
             reduction_override if reduction_override else self.reduction)
         if self.use_sigmoid:
-            if torch.cuda.is_available() and pred.is_cuda:
+            if torch.cuda.is_available() and pred.is_cuda and not self.convertor_learning:
                 pass
             else:
                 num_classes = pred.size(1)
@@ -426,7 +419,6 @@ class OSDFocalLoss(nn.Module):
                 alpha=self.alpha,
                 reduction=reduction,
                 avg_factor=avg_factor)
-
         else:
             raise NotImplementedError
         return loss_cls
