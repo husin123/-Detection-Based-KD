@@ -43,17 +43,17 @@ student = dict(
         dcn_on_last_conv=False,
         center_sampling=True,
         conv_bias=True,
-        loss_bbox=dict(type='GIoULoss', loss_weight=1.0),
+        loss_bbox=dict(type='OSDGIoULoss', loss_weight=1.0),
         # end change
         loss_cls=dict(
-            type='FocalLoss',
+            type='OSDFocalLoss',
             use_sigmoid=True,
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
         # loss_bbox=dict(type='IoULoss', loss_weight=1.0),
         loss_centerness=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)),
+            type='OSDCrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)),
     # training and testing settings
     train_cfg=dict(
         assigner=dict(
