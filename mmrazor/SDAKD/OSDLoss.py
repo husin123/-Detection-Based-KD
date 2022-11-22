@@ -190,7 +190,6 @@ def osd_binary_cross_entropy(pred,
     # do the reduction for the weighted loss
     loss = weight_reduce_loss(
         loss, weight, reduction=reduction, avg_factor=avg_factor)
-
     return loss
 
 
@@ -287,6 +286,7 @@ class OSDCrossEntropyLoss(nn.Module):
 
 
 from mmdet.models.losses.focal_loss import py_sigmoid_focal_loss, sigmoid_focal_loss
+from mmdet.models.losses.iou_loss import giou_loss
 
 def osd_py_sigmoid_focal_loss(pred,
                           target,
@@ -421,3 +421,54 @@ class OSDFocalLoss(nn.Module):
         else:
             raise NotImplementedError
         return loss_cls
+
+
+@LOSSES.register_module()
+class OSDGIoULoss(nn.Module):
+
+    def __init__(self, eps=1e-6, reduction='mean', loss_weight=1.0):
+        super(OSDGIoULoss, self).__init__()
+        self.eps = eps
+        self.reduction = reduction
+        self.loss_weight = loss_weight
+        self.convertor_training = False
+
+    def set_convertor_training(self):
+        self.convertor_training = True
+
+    def unset_convertor_training(self):
+        self.convertor_training = False
+
+    def forward(self,
+                pred,
+                target,
+                weight=None,
+                avg_factor=None,
+                reduction_override=None,
+                **kwargs):
+        if weight is not None and not torch.any(weight > 0):
+            if pred.dim() == weight.dim() + 1:
+                weight = weight.unsqueeze(1)
+            return (pred * weight).sum()  # 0
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = (
+            reduction_override if reduction_override else self.reduction)
+        if weight is not None and weight.dim() > 1:
+            # TODO: remove this in the future
+            # reduce the weight of shape (n, 4) to (n,) to match the
+            # giou_loss of shape (n,)
+            assert weight.shape == pred.shape
+            weight = weight.mean(-1)
+        loss = self.loss_weight * giou_loss(
+            pred,
+            target,
+            weight,
+            eps=self.eps,
+            reduction=reduction,
+            avg_factor=avg_factor,
+            **kwargs)
+        if self.convertor_training:
+            loss = -loss
+        return loss
+
+from mmdet.models import FCOS,FCOSHead

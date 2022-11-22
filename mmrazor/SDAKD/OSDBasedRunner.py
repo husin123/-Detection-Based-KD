@@ -76,7 +76,8 @@ class OSDBasedRunner(EpochBasedRunner):
         self.c_scaler = torch.cuda.amp.GradScaler()
 
     def run_convertor_iter(self, data_batch, **kwargs):
-        self.model.module.architecture.eval()
+        if "FCOS" not in self.model.module.architecture.model.__class__.__name__:
+            self.model.module.architecture.eval()
         self.model.module.architecture.requires_grad_(False)
         self.model.module.distiller.teacher.requires_grad_(False)
         inputs, kwargs = self.model.scatter([data_batch,self.optimizer], kwargs, self.model.device_ids)
@@ -97,7 +98,8 @@ class OSDBasedRunner(EpochBasedRunner):
             if ('parrots' not in TORCH_VERSION
                     and digit_version(TORCH_VERSION) > digit_version('1.2')):
                 self.require_forward_param_sync = False
-        self.model.module.architecture.train()
+        if "FCOS" not in self.model.module.architecture.model.__class__.__name__:
+            self.model.module.architecture.train()
         self.model.module.architecture.requires_grad_(True)
         self.model.module.distiller.teacher.requires_grad_(True)
         self.c_outputs = output
@@ -112,18 +114,17 @@ class OSDBasedRunner(EpochBasedRunner):
         self.c_total_loss = 0
         self.c_total_iter = 0
         for i, data_batch in enumerate(self.data_loader):
-            self.call_hook('before_train_iter')
-            self.run_convertor_iter(data_batch, **kwargs)
-            self.c_optimizer.zero_grad()
-            self.c_scaler.scale(self.c_outputs['loss']).backward()
-            self.c_scaler.unscale_(self.c_optimizer)
-            torch.nn.utils.clip_grad_norm_(self.model.module.convertor.parameters(),20)
-            self.c_scaler.step(self.c_optimizer)
-            self.c_scaler.update()
-            self.c_total_loss+=self.c_outputs['loss'].item()
-            self.c_total_iter+=1
-            if self.c_total_iter>3000:
-                break
+            with torch.autograd.set_detect_anomaly(True):
+                self.call_hook('before_train_iter')
+                self.run_convertor_iter(data_batch, **kwargs)
+                self.c_optimizer.zero_grad()
+                self.c_scaler.scale(self.c_outputs['loss']).backward()
+                self.c_scaler.unscale_(self.c_optimizer)
+                torch.nn.utils.clip_grad_norm_(self.model.module.convertor.parameters(),20)
+                self.c_scaler.step(self.c_optimizer)
+                self.c_scaler.update()
+                self.c_total_loss+=self.c_outputs['loss'].item()
+                self.c_total_iter+=1
             if self.c_total_iter%100==0:
                 self.logger.info('convertor loss: %s, iter: %d', round(self.c_total_loss/self.c_total_iter,4), self.c_total_iter)
                 magnitude_str = self.model.module.convertor.module.print_magnitudes()
