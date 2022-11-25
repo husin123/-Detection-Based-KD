@@ -117,7 +117,6 @@ class OSDDistill(GeneralDistill):
             data["gt_labels"] = gt_labels
             data["img"] = img
         data["img_metas"] = data["img_metas"] + copy.deepcopy(data["img_metas"])
-
         self._iter+=1
         return super(OSDDistill, self).train_step(data, optimizer)
 

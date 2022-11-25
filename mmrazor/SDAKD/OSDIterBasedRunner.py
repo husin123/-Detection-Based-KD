@@ -173,7 +173,6 @@ class OSDIterBasedRunner(IterBasedRunner):
         self.call_hook('before_epoch')
 
         while self.iter < self._max_iters:
-            print(len(iter_loaders[0]))
             if int(self.iter/len(iter_loaders[0])) in self.model.module.convertor_training_epoch:
                 p=-1
                 for i, flow in enumerate(workflow):

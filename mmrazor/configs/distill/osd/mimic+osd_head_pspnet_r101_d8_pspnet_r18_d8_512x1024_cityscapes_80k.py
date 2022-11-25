@@ -81,6 +81,20 @@ teacher = dict(
         align_corners=False,
         loss_decode=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
+    auxiliary_head=dict(
+        type='FCNHead',
+        in_channels=1024,
+        in_index=2,
+        channels=256,
+        num_convs=1,
+        concat_input=False,
+        dropout_ratio=0.1,
+        num_classes=19,
+        norm_cfg=norm_cfg,
+        align_corners=False,
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.4)),
+
 )
 
 # algorithm = dict(
@@ -114,7 +128,7 @@ find_unused_parameters = True
 algorithm = dict(
     type='OSDDistill',
     solve_number=4,
-    convertor_training_epoch=[0,6,12],
+    convertor_training_epoch=[6,12],
     convertor_epoch_number=1,
     pretrain_path='/home/sst/product/SDAKD/SDAKD_FOR_BASELINE/checkpoints/Augmentation',
     collect_key=['img', 'gt_bboxes', 'gt_labels', "gt_semantic_seg"],
@@ -132,40 +146,23 @@ algorithm = dict(
                 teacher_module='decode_head.conv_seg',
                 losses=[
                     dict(
-                        type='ChannelWiseDivergence',
-                        name='loss_cwd_logits',
+                        type='KLDivergence',
+                        name='loss_decode_kd_head',
                         tau=1,
-                        loss_weight=5,
-                    )
+                        loss_weight=1.5,
+                    ),
                 ]),
-            # dict(
-            #     student_module='bbox_head.conv_centerness',
-            #     teacher_module='bbox_head.conv_centerness',
-            #     losses=[
-            #         dict(
-            #             type='KLDivergence',
-            #             name='loss_kd_conv_centerness_head',
-            #             tau=1,
-            #             loss_weight=1.,
-            #         )
-            #     ]),
-            # dict(
-            #     student_module='neck',
-            #     teacher_module='neck',
-            #     losses=[
-            #         dict(
-            #             type='MSELoss',
-            #             name='loss_mse_fpn',
-            #             loss_weight=1,
-            #         )
-            #     ],
-            #     align_module=dict(
-            #         type='conv2d',
-            #         num_modules=5,
-            #         student_channels=256,
-            #         teacher_channels=256,
-            #     )
-            # ),
+            dict(
+                student_module='auxiliary_head.conv_seg',
+                teacher_module='auxiliary_head.conv_seg',
+                losses=[
+                    dict(
+                        type='KLDivergence',
+                        name='loss_auxiliary_kd_head',
+                        tau=1,
+                        loss_weight=0.5,
+                    ),
+                ]),
         ]),
 
 )

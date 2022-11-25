@@ -53,6 +53,7 @@ def segmentation_vis(tensor, segmentation, output_path, name):
     tensor.mul_(torch.Tensor(std)[:, None, None]).add_(
         torch.Tensor(mean)[:, None, None]
     )
+    from mmseg.models import EncoderDecoder
     segmentation = segmentation.clone().detach().cpu()
     labels = torch.from_numpy(label_colormap(torch.max(segmentation).item()+1))
     segmentation = labels[segmentation]
