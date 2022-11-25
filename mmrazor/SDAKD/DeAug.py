@@ -16,7 +16,6 @@ from .DS import DetectionFreezeSTN
 from .AP import _apply_op
 
 
-
 def relaxed_bernoulli(logits, temp=0.05):
     u = torch.rand_like(logits, device=logits.device)
     l = torch.log(u) - torch.log(1 - u)
@@ -110,14 +109,14 @@ class Mulit_Augmentation(nn.Module):
 
         for name in self.LEARNING_STN_LIST:
             path = concat_path(name)
-            state_dict = torch.load(path,map_location="cpu")
+            state_dict = torch.load(path, map_location="cpu")
             model = DetectionFreezeSTN()
             model.load_state_dict(state_dict)
             self.learning_stn_model_list.append(model)
 
         for name in self.LEARNING_COLOR_LIST:
             path = concat_path(name)
-            state_dict = torch.load(path,map_location="cpu")
+            state_dict = torch.load(path, map_location="cpu")
             model = DetectionColorAugmentation()
             model.load_state_dict(state_dict)
             self.learning_color_model_list.append(model)
@@ -151,16 +150,16 @@ class Mulit_Augmentation(nn.Module):
         magnitudes = torch.sigmoid(self.magnitudes.data)
         keys = self.LEARNING_COLOR_LIST + self.LEARNING_STN_LIST
         result_str = ""
-        for key,magnitude in zip(keys,magnitudes):
-            result_str+=f"key is {key}, magnitude is {round(magnitude.item(),3)}; "
+        for key, magnitude in zip(keys, magnitudes):
+            result_str += f"key is {key}, magnitude is {round(magnitude.item(), 3)}; "
         return result_str
 
     def print_probabilities(self):
         probabilities = torch.sigmoid(self.probabilities.data)
         keys = self.LEARNING_COLOR_LIST + self.LEARNING_STN_LIST
         result_str = ""
-        for key,probability in zip(keys,probabilities):
-            result_str+=f"key is {key}, probability is {round(probability.item(),3)}; "
+        for key, probability in zip(keys, probabilities):
+            result_str += f"key is {key}, probability is {round(probability.item(), 3)}; "
         return result_str
 
     @torch.no_grad()
@@ -168,7 +167,7 @@ class Mulit_Augmentation(nn.Module):
         self.probabilities.data = torch.clamp(self.probabilities.data, -10, 10)
         self.magnitudes.data = torch.clamp(self.magnitudes.data, -10, 10)
 
-    def forward(self, image, boxes, labels):
+    def forward(self, image, boxes=None, labels=None, semantic_seg=None):
         self._clamp()
         p = torch.sigmoid(self.probabilities)
         m = torch.sigmoid(self.magnitudes)
@@ -211,14 +210,30 @@ class Mulit_Augmentation(nn.Module):
         if len(stn_result) > 0:
             stn_result = torch.stack(stn_result).sum(0) + \
                          torch.Tensor([[[1, 0, 0], [0, 1, 0]]]).to(stn_result[0].device).expand_as(stn_result[0])
-            image, boxes, labels = self.forward_stn(image, stn_result, boxes, labels)
-        return image, boxes, labels
+            if semantic_seg == None:
+                image, boxes, labels = self.forward_stn_det(image, stn_result, boxes, labels)
+            else:
+                image, semantic_seg = self.forward_stn_seg(image, stn_result, semantic_seg)
+        if semantic_seg == None:
+            return image, boxes, labels
+        else:
+            return image, semantic_seg
 
-    def forward_stn(self, x, H, boxes, labels):
+    def forward_stn_det(self, x, H, boxes, labels):
         grid = torch.nn.functional.affine_grid(H, x.size())
         x = torch.nn.functional.grid_sample(x, grid)
         boxes, labels = self.forward_box(boxes, labels, H, x.shape)
         return x, boxes, labels
+
+    def forward_stn_seg(self, x, H, semantic_seg):
+        grid = torch.nn.functional.affine_grid(H, x.size())
+        x = torch.nn.functional.grid_sample(x, grid)
+        semantic_seg = torch.nn.functional.grid_sample(semantic_seg.float() + 1, grid, mode="nearest")
+        semantic_seg[semantic_seg == 0] = 255
+        semantic_seg = semantic_seg - 1
+        semantic_seg[semantic_seg >= 20] = 255
+        semantic_seg = semantic_seg.contiguous().long()
+        return x, semantic_seg
 
     def forward_box(self, boxes, labels, H, size):
         b, c, h, w = size
@@ -233,8 +248,9 @@ class Mulit_Augmentation(nn.Module):
         new10 = H[:, 1, 0] / _w
         new11 = - H[:, 0, 0] / _w
         new12 = (H[:, 0, 2] * H[:, 1, 0] - H[:, 1, 2] * H[:, 0, 0]) / _w
-        new00,new01,new02,new10,new11,new12 = new00.clone(), new01.clone(),new02.clone(), new10.clone(), new11.clone(), new12.clone()
-        H = torch.stack([torch.stack([new00,new10],dim=-1),torch.stack([new01,new11],dim=-1),torch.stack([new02,new12],dim=-1)],dim=-1)
+        new00, new01, new02, new10, new11, new12 = new00.clone(), new01.clone(), new02.clone(), new10.clone(), new11.clone(), new12.clone()
+        H = torch.stack([torch.stack([new00, new10], dim=-1), torch.stack([new01, new11], dim=-1),
+                         torch.stack([new02, new12], dim=-1)], dim=-1)
         H = H.contiguous()
         for i, box in enumerate(boxes):  # min_x,min_y,max_x,_max_y
             label = labels[i]
@@ -272,9 +288,9 @@ class Mulit_Augmentation(nn.Module):
             min_x[min_x > w] = w
             min_y[min_y < 0] = 0
             min_y[min_y > h] = h
-            max_x = torch.where(max_x < min_x,min_x,max_x)
+            max_x = torch.where(max_x < min_x, min_x, max_x)
             max_x[max_x > w] = w
-            max_y = torch.where(max_y < min_y,min_y,max_y)
+            max_y = torch.where(max_y < min_y, min_y, max_y)
             max_y[max_y > h] = h
 
             box = torch.stack([min_x, min_y, max_x, max_y],
